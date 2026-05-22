@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Markdown Viewer</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MD Viewer">
+<meta name="theme-color" content="#ffffff">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Noto+Sans+KR:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fafaf9;--surf:#fff;--b1:#e8e8e6;--b2:#d0d0ce;
+  --tx:#1c1c1a;--mu:#88887f;--ac:#2563eb;--ah:#1d4ed8;--re:#dc2626;
+  --ui:'Inter',system-ui,-apple-system,sans-serif;--rr:8px;--rl:12px
+}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--ui);font-size:15px;-webkit-font-smoothing:antialiased}
+
+/* ── Screens ── */
+#s1{
+  position:fixed;inset:0;z-index:5;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.5rem;
+  padding:max(2rem,env(safe-area-inset-top,0px)) 1.5rem max(2rem,env(safe-area-inset-bottom,0px))
+}
+#s2{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg)}
+#s2.v{display:flex}
+
+/* ── Mode select ── */
+.logo{text-align:center}
+.logo h1{font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
+.logo p{margin-top:.35rem;color:var(--mu);font-size:.875rem}
+.cards{display:flex;gap:.875rem;flex-wrap:wrap;justify-content:center;width:100%;max-width:560px}
+.card{
+  flex:1 1 145px;display:flex;flex-direction:column;align-items:center;gap:.55rem;
+  padding:1.5rem 1rem;background:var(--surf);border:1.5px solid var(--b1);border-radius:var(--rl);
+  cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+  transition:border-color .15s,box-shadow .15s,transform .12s
+}
+.card:hover,.card:focus-visible{border-color:var(--ac);box-shadow:0 0 0 3px rgba(37,99,235,.1);outline:none}
+.card:active{transform:scale(.97)}
+.ci{font-size:1.9rem}.ct{font-size:.925rem;font-weight:600}
+.cd{font-size:.775rem;color:var(--mu);text-align:center;line-height:1.4}
+
+/* ── Toolbar ── */
+.tb{
+  flex-shrink:0;height:52px;background:var(--surf);border-bottom:1px solid var(--b1);
+  display:none;align-items:center;gap:.35rem;
+  padding:0 max(.875rem,env(safe-area-inset-right,0px)) 0 max(.875rem,env(safe-area-inset-left,0px));
+  overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;white-space:nowrap
+}
+.tb::-webkit-scrollbar{display:none}
+.tb.v{display:flex}
+.sep{width:1px;height:18px;background:var(--b1);flex-shrink:0;margin:0 .15rem}
+.gap{flex:1;min-width:.25rem}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;gap:.3rem;padding:.38rem .65rem;
+  border-radius:var(--rr);border:1px solid var(--b1);background:var(--surf);
+  color:var(--tx);font-family:var(--ui);font-size:.78rem;font-weight:500;
+  cursor:pointer;white-space:nowrap;flex-shrink:0;min-height:36px;
+  transition:background .1s,border-color .1s;
+  -webkit-tap-highlight-color:transparent;user-select:none
+}
+.btn:hover{background:var(--bg);border-color:var(--b2)}
+.btn:active{background:#f0f0ee}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--mu)}
+.btn.ghost:hover{background:var(--bg);border-color:var(--b1);color:var(--tx)}
+.btn.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
+.btn.pri:hover{background:var(--ah);border-color:var(--ah)}
+.btn.dng{color:var(--re);border-color:#fecaca}
+.btn.dng:hover{background:#fef2f2;border-color:#fca5a5}
+.btn.sm{padding:.28rem .5rem;min-height:0}
+.fn{font-size:.78rem;font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;color:var(--mu)}
+.fn.v{color:var(--tx)}
+.udot{width:7px;height:7px;border-radius:50%;background:var(--ac);flex-shrink:0;display:none}
+.udot.v{display:block}
+
+/* ── Font select + size controls ── */
+select{padding:.33rem .5rem;border-radius:var(--rr);border:1px solid var(--b1);background:var(--surf);color:var(--tx);font-family:var(--ui);font-size:.78rem;cursor:pointer;outline:none;flex-shrink:0}
+
+/* Segmented control (size presets + view toggle) */
+.seg{display:flex;border:1px solid var(--b1);border-radius:var(--rr);overflow:hidden;flex-shrink:0}
+.seg button{padding:.3rem .65rem;background:var(--surf);color:var(--mu);font-family:var(--ui);font-size:.72rem;font-weight:600;cursor:pointer;border:none;border-right:1px solid var(--b1);transition:background .1s,color .1s;min-height:36px;-webkit-tap-highlight-color:transparent}
+.seg button:last-child{border-right:none}
+.seg button:hover{background:var(--bg);color:var(--tx)}
+.seg button.v{background:var(--ac);color:#fff}
+
+.szf{display:flex;align-items:center;gap:.2rem;flex-shrink:0}
+.szn{font-size:.72rem;color:var(--mu);min-width:2.2rem;text-align:center}
+
+/* ── Content areas ── */
+.ca{flex:1;min-height:0;overflow:hidden;display:none;flex-direction:column}
+.ca.v{display:flex}
+.ca-scroll{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:flex;justify-content:center;
+  padding:2rem 1.25rem max(5rem,calc(4rem + env(safe-area-inset-bottom,0px)))
+}
+.ca-edit{
+  flex:1;display:flex;
+  padding:.875rem .875rem max(calc(.875rem + env(safe-area-inset-bottom,0px))) .875rem
+}
+
+/* ── Empty state ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.65rem;min-height:55vh;width:100%;color:var(--mu);text-align:center}
+.empty .ei{font-size:2.2rem}
+.empty p{font-size:.85rem;line-height:1.6}
+
+/* ── Markdown rendering ── */
+.md{width:100%;max-width:720px;line-height:1.75;color:var(--tx)}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{font-weight:700;line-height:1.3;margin:1.75em 0 .6em;color:var(--tx)}
+.md h1:first-child,.md h2:first-child,.md h3:first-child{margin-top:0}
+.md h1{font-size:2em}
+.md h2{font-size:1.5em;border-bottom:1px solid var(--b1);padding-bottom:.3em}
+.md h3{font-size:1.25em}.md h4{font-size:1.05em}.md h5{font-size:.95em}
+.md h6{font-size:.875em;color:var(--mu)}
+.md p{margin:.9em 0}.md p:first-child{margin-top:0}
+.md a{color:var(--ac);text-decoration:underline;text-underline-offset:2px}
+.md a:hover{color:var(--ah)}
+.md strong{font-weight:700}.md em{font-style:italic}
+.md ul,.md ol{margin:.9em 0;padding-left:1.75em}.md li{margin:.3em 0}
+.md li>ul,.md li>ol{margin:.2em 0}
+.md blockquote{margin:1em 0;padding:.5em 1em;border-left:3px solid var(--b2);color:var(--mu);border-radius:0 4px 4px 0}
+.md blockquote p{margin:.3em 0}
+.md code{font-family:'SFMono-Regular',Consolas,Menlo,monospace;font-size:.875em;background:#f4f4f2;padding:.15em .4em;border-radius:4px;color:#c7254e}
+.md pre{background:#f4f4f2;border-radius:8px;padding:1em 1.25em;overflow-x:auto;margin:1em 0;border:1px solid var(--b1)}
+.md pre code{background:none;padding:0;color:var(--tx);border-radius:0}
+.md hr{border:none;border-top:1px solid var(--b1);margin:1.75em 0}
+.md table{border-collapse:collapse;width:100%;margin:1em 0}
+.md th,.md td{border:1px solid var(--b1);padding:.45em .7em;text-align:left}
+.md th{background:var(--bg);font-weight:600}
+.md img{max-width:100%;border-radius:6px}
+
+/* ── Editor ── */
+#editor{
+  flex:1;min-width:0;padding:1rem 1.1rem;
+  border:1px solid var(--b1);border-radius:10px;
+  background:var(--surf);color:var(--tx);
+  font-family:'SFMono-Regular',Consolas,Menlo,monospace;
+  font-size:.875rem;line-height:1.7;
+  resize:none;outline:none;tab-size:4;-webkit-appearance:none;
+  transition:border-color .15s
+}
+#editor:focus{border-color:var(--ac)}
+#editor::placeholder{color:var(--mu)}
+
+/* Preview empty placeholder */
+.pmin{color:var(--mu);font-style:italic;text-align:center;margin-top:3rem}
+
+/* ── Overlays ── */
+.ov{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.32);
+  z-index:20;align-items:center;justify-content:center;padding:1.25rem
+}
+.ov.v{display:flex}
+.dlg{background:var(--surf);border-radius:var(--rl);padding:1.35rem;width:100%;max-width:360px;border:1px solid var(--b1);box-shadow:0 8px 40px rgba(0,0,0,.14)}
+.dlg h3{font-size:.95rem;font-weight:600;margin-bottom:.4rem}
+.dlg p{font-size:.82rem;color:var(--mu);line-height:1.5}
+.sdlg{background:var(--surf);border-radius:var(--rl);padding:1.35rem;width:100%;max-width:400px;border:1px solid var(--b1);box-shadow:0 8px 40px rgba(0,0,0,.14)}
+.sdlg h3{font-size:.95rem;font-weight:600;margin-bottom:.35rem}
+.sdlg .sub{font-size:.8rem;color:var(--mu);line-height:1.45;margin-bottom:.85rem}
+.sdlg input{width:100%;padding:.45rem .7rem;border:1px solid var(--b1);border-radius:var(--rr);font-family:var(--ui);font-size:.875rem;color:var(--tx);outline:none;-webkit-appearance:none;transition:border-color .15s}
+.sdlg input:focus{border-color:var(--ac)}
+.hint{font-size:.73rem;color:var(--mu);margin-top:.35rem}
+.acts{display:flex;justify-content:flex-end;gap:.4rem;margin-top:1.1rem}
+
+/* iOS save note */
+.iosn{display:none;margin-top:.75rem;padding:.6rem .75rem;background:#eff6ff;border-radius:var(--rr);border:1px solid #bfdbfe;font-size:.75rem;color:#1e40af;line-height:1.5}
+.iosn.v{display:block}
+
+/* ── Toast ── */
+#toast{
+  position:fixed;
+  bottom:max(1.5rem,calc(1.5rem + env(safe-area-inset-bottom,0px)));
+  left:50%;transform:translateX(-50%);
+  background:#1c1c1a;color:#fff;padding:.65rem 1.2rem;border-radius:100px;
+  font-size:.8rem;max-width:calc(100vw - 2rem);text-align:center;
+  opacity:0;pointer-events:none;transition:opacity .25s;z-index:30;white-space:nowrap
+}
+#toast.v{opacity:1}
+#fi{display:none}
+</style>
+</head>
+<body>
+
+<input type="file" id="fi" accept=".md,.txt,text/markdown,text/plain">
+
+<!-- ════════ Screen 1: Mode Select ════════ -->
+<div id="s1">
+  <div class="logo">
+    <h1>Markdown Viewer</h1>
+    <p>Choose a mode to get started</p>
+  </div>
+  <div class="cards">
+    <div class="card" id="mc-r" role="button" tabindex="0">
+      <span class="ci">📖</span>
+      <span class="ct">Reading</span>
+      <span class="cd">Open and read an existing .md file</span>
+    </div>
+    <div class="card" id="mc-e" role="button" tabindex="0">
+      <span class="ci">✏️</span>
+      <span class="ct">Editing</span>
+      <span class="cd">Edit an existing file with Source / Preview</span>
+    </div>
+    <div class="card" id="mc-c" role="button" tabindex="0">
+      <span class="ci">📝</span>
+      <span class="ct">Create</span>
+      <span class="cd">Write a new note from scratch</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ Screen 2: Main App ════════ -->
+<div id="s2">
+
+  <!-- Reading toolbar -->
+  <div id="tb-r" class="tb">
+    <button class="btn ghost" id="r-back">← Mode</button>
+    <div class="sep"></div>
+    <button class="btn" id="r-open">📂 Open</button>
+    <div class="fn" id="r-fn">No file open</div>
+    <div class="gap"></div>
+    <label for="fsel" style="font-size:.72rem;color:var(--mu);flex-shrink:0">Font</label>
+    <select id="fsel">
+      <option value="verdana">Verdana</option>
+      <option value="lexend">Lexend</option>
+      <option value="atkinson">Atkinson Hyperlegible</option>
+    </select>
+    <div class="sep"></div>
+    <div class="seg" id="sz-pre">
+      <button data-sz="14">S</button>
+      <button data-sz="16" class="v">M</button>
+      <button data-sz="20">L</button>
+      <button data-sz="24">XL</button>
+    </div>
+    <div class="szf">
+      <button class="btn sm" id="sz-dec">−</button>
+      <span class="szn" id="sz-n">16px</span>
+      <button class="btn sm" id="sz-inc">+</button>
+    </div>
+  </div>
+
+  <!-- Editing toolbar -->
+  <div id="tb-e" class="tb">
+    <button class="btn ghost" id="e-back">← Mode</button>
+    <div class="sep"></div>
+    <button class="btn" id="e-open">📂 Open</button>
+    <span class="udot" id="e-udot"></span>
+    <div class="fn" id="e-fn">No file open</div>
+    <div class="seg view-tog" id="e-view" style="display:none">
+      <button data-v="source" class="v">Source</button>
+      <button data-v="preview">Preview</button>
+    </div>
+    <div class="gap"></div>
+    <button class="btn pri" id="e-saveas" disabled style="opacity:.5">💾 Save As…</button>
+    <button class="btn dng" id="e-close" disabled style="opacity:.5">Close</button>
+  </div>
+
+  <!-- Create toolbar -->
+  <div id="tb-c" class="tb">
+    <button class="btn ghost" id="c-back">← Mode</button>
+    <div class="sep"></div>
+    <span class="udot" id="c-udot"></span>
+    <div class="fn v" id="c-fn">Untitled</div>
+    <div class="seg view-tog" id="c-view">
+      <button data-v="source" class="v">Source</button>
+      <button data-v="preview">Preview</button>
+    </div>
+    <div class="gap"></div>
+    <button class="btn pri" id="c-saveas">💾 Save As…</button>
+  </div>
+
+  <!-- Reading content -->
+  <div class="ca" id="ca-read">
+    <div class="ca-scroll">
+      <div class="empty" id="r-empty">
+        <div class="ei">📄</div>
+        <p>Open a <strong>.md</strong> file to start reading.<br>Use the <em>Open</em> button above.</p>
+      </div>
+      <div class="md" id="r-md" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Editing/Create source view -->
+  <div class="ca" id="ca-src">
+    <div class="ca-scroll" id="e-empty-wrap" style="display:none">
+      <div class="empty">
+        <div class="ei">📝</div>
+        <p>Open a <strong>.md</strong> file to start editing.<br>Use the <em>Open</em> button above.</p>
+      </div>
+    </div>
+    <div class="ca-edit" id="src-wrap">
+      <textarea id="editor" placeholder="Start writing in Markdown…"
+        spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+    </div>
+  </div>
+
+  <!-- Editing/Create preview view -->
+  <div class="ca" id="ca-prv">
+    <div class="ca-scroll">
+      <div class="md" id="p-md"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Discard confirm dialog -->
+<div class="ov" id="ov-d">
+  <div class="dlg">
+    <h3 id="d-t">Discard unsaved changes?</h3>
+    <p id="d-m">Your unsaved changes will be discarded. The original file will not be affected.</p>
+    <div class="acts">
+      <button class="btn" id="d-cancel">Keep editing</button>
+      <button class="btn dng" id="d-ok">Discard &amp; continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save As dialog -->
+<div class="ov" id="ov-s">
+  <div class="sdlg">
+    <h3>Save As New File</h3>
+    <p class="sub" id="s-sub">The original file will not be changed or deleted.</p>
+    <input type="text" id="s-inp" placeholder="my-note"
+      autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="hint" id="s-hint">.md will be added automatically</div>
+    <div class="iosn" id="ios-n">
+      📱 <strong>On iPhone:</strong> a share sheet will open — tap
+      <strong>"Save to Files"</strong> to save directly to the iPhone Files app.
+    </div>
+    <div class="acts">
+      <button class="btn" id="s-cancel">Cancel</button>
+      <button class="btn pri" id="s-ok">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── PWA: generate icon + manifest dynamically ─────────────────────────────────
+(function(){
+  try{
+    const c=document.createElement('canvas');c.width=c.height=512;
+    const g=c.getContext('2d');
+    const [r,s]=[100,512];
+    g.fillStyle='#2563eb';
+    g.beginPath();
+    g.moveTo(r,0);g.lineTo(s-r,0);g.quadraticCurveTo(s,0,s,r);
+    g.lineTo(s,s-r);g.quadraticCurveTo(s,s,s-r,s);g.lineTo(r,s);
+    g.quadraticCurveTo(0,s,0,s-r);g.lineTo(0,r);g.quadraticCurveTo(0,0,r,0);
+    g.closePath();g.fill();
+    g.fillStyle='#fff';g.font='bold 210px Inter,system-ui,sans-serif';
+    g.textAlign='center';g.textBaseline='middle';g.fillText('MD',256,256);
+    const ico=c.toDataURL('image/png');
+    const al=document.createElement('link');
+    al.rel='apple-touch-icon';al.href=ico;document.head.appendChild(al);
+    const mf={
+      name:'Markdown Viewer',short_name:'MD Viewer',
+      description:'Read and edit Markdown files',
+      start_url:location.href,display:'standalone',
+      theme_color:'#ffffff',background_color:'#fafaf9',
+      icons:[{src:ico,sizes:'512x512',type:'image/png',purpose:'any maskable'}]
+    };
+    const ml=document.createElement('link');ml.rel='manifest';
+    ml.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/manifest+json'}));
+    document.head.appendChild(ml);
+  }catch(e){}
+})();
+
+// ── Markdown config ───────────────────────────────────────────────────────────
+marked.setOptions({breaks:true,gfm:true});
+
+// ── iOS detection ─────────────────────────────────────────────────────────────
+const isIOS=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+if(isIOS) document.getElementById('ios-n').classList.add('v');
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const st={
+  mode:null,         // 'reading' | 'editing' | 'create'
+  view:'source',     // 'source' | 'preview' (used by editing/create)
+  fn:'',fb:'',       // filename + base
+  orig:'',edit:'',   // baseline (last saved/loaded) + current content
+  font:'verdana',sz:16,
+  unsaved:false,pending:null
+};
+const fonts={
+  verdana:"Verdana,'Noto Sans KR',sans-serif",
+  lexend:"'Lexend','Noto Sans KR',sans-serif",
+  atkinson:"'Atkinson Hyperlegible','Noto Sans KR',sans-serif"
+};
+const $=id=>document.getElementById(id);
+const orgMsg='The original file will not be affected.';
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let tt;
+function toast(msg,dur=3800){
+  const t=$('toast');t.textContent=msg;t.classList.add('v');
+  clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('v'),dur);
+}
+
+// ── Screen helpers ────────────────────────────────────────────────────────────
+function showS1(){
+  $('s1').style.display='flex';
+  $('s2').classList.remove('v');
+  st.mode=null;
+}
+function showS2(){$('s1').style.display='none';$('s2').classList.add('v');}
+
+// ── Mode + view rendering ─────────────────────────────────────────────────────
+function applyMode(){
+  // Toolbars
+  $('tb-r').classList.toggle('v',st.mode==='reading');
+  $('tb-e').classList.toggle('v',st.mode==='editing');
+  $('tb-c').classList.toggle('v',st.mode==='create');
+
+  // Content areas
+  const showRead=(st.mode==='reading');
+  const inEdit=(st.mode==='editing'||st.mode==='create');
+  const showSrc=inEdit&&st.view==='source';
+  const showPrv=inEdit&&st.view==='preview';
+
+  $('ca-read').classList.toggle('v',showRead);
+  $('ca-src').classList.toggle('v',showSrc);
+  $('ca-prv').classList.toggle('v',showPrv);
+
+  // In Editing mode, show empty wrapper if no file loaded
+  if(st.mode==='editing'){
+    const hasFile=!!st.fn;
+    $('e-empty-wrap').style.display=hasFile?'none':'flex';
+    $('src-wrap').style.display=hasFile?'flex':'none';
+    $('e-view').style.display=hasFile?'flex':'none';
+    $('e-saveas').disabled=!hasFile;
+    $('e-saveas').style.opacity=hasFile?'1':'.5';
+    $('e-close').disabled=!hasFile;
+    $('e-close').style.opacity=hasFile?'1':'.5';
+  }else{
+    $('e-empty-wrap').style.display='none';
+    $('src-wrap').style.display='flex';
+  }
+
+  // Update view toggle highlights
+  document.querySelectorAll('.view-tog button').forEach(b=>{
+    b.classList.toggle('v',b.dataset.v===st.view);
+  });
+
+  // Preview rendering (re-render on each switch to preview)
+  if(showPrv){
+    const content=st.edit||'';
+    if(content.trim()){
+      $('p-md').innerHTML=marked.parse(content);
+    }else{
+      $('p-md').innerHTML='<p class="pmin">Nothing to preview yet — switch to Source and start writing.</p>';
+    }
+  }
+}
+
+// ── File helpers ──────────────────────────────────────────────────────────────
+function clearAll(){
+  st.fn='';st.fb='';st.orig='';st.edit='';st.unsaved=false;
+  $('r-fn').textContent='No file open';$('r-fn').classList.remove('v');
+  $('e-fn').textContent='No file open';$('e-fn').classList.remove('v');
+  $('c-fn').textContent='Untitled';
+  $('r-md').innerHTML='';$('r-md').style.display='none';
+  $('r-empty').style.display='flex';
+  $('editor').value='';
+  $('p-md').innerHTML='';
+  $('e-udot').classList.remove('v');
+  $('c-udot').classList.remove('v');
+}
+
+function loadFile(name,content){
+  st.fn=name;st.fb=name.replace(/\.md$/i,'');
+  st.orig=content;st.edit=content;st.unsaved=false;
+  $('e-udot').classList.remove('v');
+
+  // Reading view
+  $('r-fn').textContent=name;$('r-fn').classList.add('v');
+  $('r-md').innerHTML=marked.parse(content);
+  $('r-md').style.display='block';
+  $('r-empty').style.display='none';
+  applyFont();
+
+  // Editing view
+  $('e-fn').textContent=name;$('e-fn').classList.add('v');
+  $('editor').value=content;
+
+  applyMode();
+}
+
+function applyFont(){
+  $('r-md').style.fontFamily=fonts[st.font];
+  $('r-md').style.fontSize=st.sz+'px';
+}
+
+function updateSz(){
+  $('sz-n').textContent=st.sz+'px';
+  document.querySelectorAll('#sz-pre button').forEach(b=>{
+    b.classList.toggle('v',+b.dataset.sz===st.sz);
+  });
+  applyFont();
+}
+
+function updateUnsavedDot(){
+  st.unsaved=(st.edit!==st.orig);
+  $('e-udot').classList.toggle('v',st.mode==='editing'&&st.unsaved);
+  $('c-udot').classList.toggle('v',st.mode==='create'&&st.unsaved);
+}
+
+// ── Filename suggestion ───────────────────────────────────────────────────────
+function suggestNameFromContent(content){
+  if(!content)return 'untitled-note';
+  const m=content.match(/^#+\s+(.+?)\s*$/m);
+  if(!m)return 'untitled-note';
+  let n=m[1].trim().slice(0,60);
+  // Remove characters that are invalid in filenames; keep Korean, alphanumerics, spaces, hyphens
+  n=n.replace(/[\\/:*?"<>|#]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+  return n||'untitled-note';
+}
+
+// ── File picker (UTF-8) ───────────────────────────────────────────────────────
+let pcb=null;
+function pick(cb){pcb=cb;$('fi').value='';$('fi').click();}
+$('fi').addEventListener('change',()=>{
+  const f=$('fi').files[0];if(!f){pcb=null;return;}
+  const r=new FileReader();
+  r.onload=e=>{if(pcb){pcb(f.name,e.target.result);pcb=null;}};
+  r.onerror=()=>{alert('Failed to read file. Please try again.');pcb=null;};
+  r.readAsText(f,'UTF-8');
+});
+
+// ── Save: Web Share API on iOS/mobile, download fallback elsewhere ─────────────
+async function saveFile(fn,content){
+  const bytes=new TextEncoder().encode(content); // guaranteed UTF-8
+  const file=new File([bytes],fn,{type:'text/markdown'});
+
+  let shared=false;
+  try{
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:fn});
+      shared=true;
+    }
+  }catch(e){
+    if(e.name==='AbortError')return false; // user dismissed share sheet, keep unsaved
+  }
+
+  if(!shared){
+    const url=URL.createObjectURL(new Blob([bytes],{type:'text/markdown;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download=fn;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('✓ File downloaded: '+fn);
+  }else{
+    toast(isIOS?'✓ Done — find your file in the Files app':'✓ Saved: '+fn, 4500);
+  }
+  return true;
+}
+
+// ── Dialogs ───────────────────────────────────────────────────────────────────
+function openOv(id){$(id).classList.add('v');}
+function closeOv(id){$(id).classList.remove('v');}
+['ov-d','ov-s'].forEach(id=>{
+  $(id).addEventListener('click',e=>{
+    if(e.target===$(id)){st.pending=null;closeOv(id);}
+  });
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if($('ov-s').classList.contains('v')){closeOv('ov-s');}
+    else if($('ov-d').classList.contains('v')){st.pending=null;closeOv('ov-d');}
+  }
+});
+
+function withDiscard(title,msg,cb){
+  $('d-t').textContent=title;$('d-m').textContent=msg;
+  st.pending=cb;openOv('ov-d');
+}
+$('d-cancel').addEventListener('click',()=>{st.pending=null;closeOv('ov-d');});
+$('d-ok').addEventListener('click',()=>{
+  closeOv('ov-d');
+  if(st.pending){st.pending();st.pending=null;}
+});
+
+// ── Mode select ───────────────────────────────────────────────────────────────
+function enterReading(){
+  st.mode='reading';clearAll();showS2();applyMode();
+  pick((n,c)=>loadFile(n,c));
+}
+function enterEditing(){
+  st.mode='editing';st.view='source';clearAll();showS2();applyMode();
+  pick((n,c)=>loadFile(n,c));
+}
+function enterCreate(){
+  st.mode='create';st.view='source';clearAll();
+  st.fn='';st.fb='';st.orig='';st.edit='';
+  $('c-fn').textContent='Untitled';
+  $('editor').value='';
+  showS2();applyMode();
+  setTimeout(()=>$('editor').focus(),120);
+}
+$('mc-r').addEventListener('click',enterReading);
+$('mc-e').addEventListener('click',enterEditing);
+$('mc-c').addEventListener('click',enterCreate);
+[$('mc-r'),$('mc-e'),$('mc-c')].forEach(el=>{
+  el.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click();}
+  });
+});
+
+// ── Reading toolbar ───────────────────────────────────────────────────────────
+$('r-open').addEventListener('click',()=>pick((n,c)=>loadFile(n,c)));
+$('r-back').addEventListener('click',()=>{clearAll();showS1();applyMode();});
+$('fsel').addEventListener('change',()=>{st.font=$('fsel').value;applyFont();});
+document.querySelectorAll('#sz-pre button').forEach(b=>{
+  b.addEventListener('click',()=>{st.sz=+b.dataset.sz;updateSz();});
+});
+$('sz-dec').addEventListener('click',()=>{if(st.sz>10){st.sz--;updateSz();}});
+$('sz-inc').addEventListener('click',()=>{if(st.sz<56){st.sz++;updateSz();}});
+
+// ── Editing toolbar ───────────────────────────────────────────────────────────
+$('e-open').addEventListener('click',()=>{
+  const go=()=>pick((n,c)=>loadFile(n,c));
+  st.unsaved
+    ?withDiscard('Discard unsaved changes?','Opening a new file will discard your unsaved changes. '+orgMsg,go)
+    :go();
+});
+$('e-back').addEventListener('click',()=>{
+  const go=()=>{clearAll();showS1();applyMode();};
+  st.unsaved
+    ?withDiscard('Discard unsaved changes?','Switching modes will discard your unsaved changes. '+orgMsg,go)
+    :go();
+});
+$('e-close').addEventListener('click',()=>{
+  if(!st.fn)return;
+  const go=()=>{clearAll();st.view='source';applyMode();};
+  st.unsaved
+    ?withDiscard('Discard unsaved changes?','Closing the file will discard your unsaved changes. '+orgMsg,go)
+    :go();
+});
+
+// ── Create toolbar ────────────────────────────────────────────────────────────
+$('c-back').addEventListener('click',()=>{
+  const go=()=>{clearAll();showS1();applyMode();};
+  st.unsaved
+    ?withDiscard('Discard unsaved note?','Your unsaved note will be discarded. This note has not been saved to any file yet.',go)
+    :go();
+});
+
+// ── Editor input ──────────────────────────────────────────────────────────────
+$('editor').addEventListener('input',()=>{
+  st.edit=$('editor').value;
+  updateUnsavedDot();
+});
+
+// ── View toggle (Source/Preview) ──────────────────────────────────────────────
+document.querySelectorAll('.view-tog button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    st.view=b.dataset.v;
+    // Make sure latest edit is captured before previewing
+    st.edit=$('editor').value;
+    applyMode();
+    if(st.view==='source')setTimeout(()=>$('editor').focus(),60);
+  });
+});
+
+// ── Save As (Editing + Create share the same dialog) ──────────────────────────
+function openSaveDialog(suggested,subText){
+  $('s-sub').textContent=subText;
+  $('s-inp').value=suggested;
+  $('s-hint').textContent='→ Will save as: '+suggested+'.md';
+  openOv('ov-s');
+  setTimeout(()=>{$('s-inp').focus();$('s-inp').select();},80);
+}
+
+$('e-saveas').addEventListener('click',()=>{
+  if(!st.fn)return;
+  st.edit=$('editor').value;
+  openSaveDialog(st.fb+'-edited','The original file will not be changed or deleted.');
+});
+$('c-saveas').addEventListener('click',()=>{
+  st.edit=$('editor').value;
+  if(!st.edit.trim()){alert('There is nothing to save yet.');return;}
+  const sug=suggestNameFromContent(st.edit);
+  openSaveDialog(sug,'A new file will be created. Nothing existing will be modified.');
+});
+
+$('s-inp').addEventListener('input',()=>{
+  const v=$('s-inp').value.trim();
+  if(v){
+    const fn=v.toLowerCase().endsWith('.md')?v:v+'.md';
+    $('s-hint').textContent='→ Will save as: '+fn;
+  }else{
+    $('s-hint').textContent='.md will be added automatically';
+  }
+});
+$('s-inp').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();doSave();}
+});
+$('s-cancel').addEventListener('click',()=>closeOv('ov-s'));
+$('s-ok').addEventListener('click',doSave);
+
+async function doSave(){
+  const raw=$('s-inp').value.trim();
+  if(!raw){$('s-inp').focus();return;}
+  const fn=raw.toLowerCase().endsWith('.md')?raw:raw+'.md';
+  closeOv('ov-s');
+  const ok=await saveFile(fn,st.edit);
+  if(ok){
+    // Mark as saved baseline (Save As only — original file untouched)
+    st.orig=st.edit;
+    updateUnsavedDot();
+    // In Create mode, show the new filename in the toolbar
+    if(st.mode==='create'){
+      st.fn=fn;st.fb=fn.replace(/\.md$/i,'');
+      $('c-fn').textContent=fn;
+    }
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+updateSz();
+</script>
+</body>
+</html>
